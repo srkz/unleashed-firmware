@@ -155,7 +155,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "S10401",
-        .manufacturer = "HID",
+        .manufacturer = "AMAG",
         .bit_size = 37,
         .fc_position = 1,
         .fc_size = 6,

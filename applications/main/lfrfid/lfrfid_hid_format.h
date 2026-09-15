@@ -1,7 +1,7 @@
 /** @file lfrfid_hid_format.h
  *
  * The well-known Wiegand formats carried on HID Proximity cards, HID's own and other
- * makers' (Continental C10202), read out of and packed into the 44-bit field that the
+ * makers' (AMAG S10401, Continental C10202), read out of and packed into the 44-bit field that the
  * firmware's Generic HIDProx protocol carries as its data.
  */
 
