@@ -1,7 +1,8 @@
 /** @file lfrfid_hid_format.h
  *
- * The well-known HID Proximity Wiegand formats, read out of and packed into the 44-bit
- * field that the firmware's Generic HIDProx protocol carries as its data.
+ * The well-known Wiegand formats carried on HID Proximity cards, HID's own and other
+ * makers' (Continental C10202), read out of and packed into the 44-bit field that the
+ * firmware's Generic HIDProx protocol carries as its data.
  */
 
 #pragma once
@@ -22,6 +23,9 @@ const LfRfidHidFormat* lfrfid_hid_format_get(size_t index);
 
 /** The format's name as shown to the user, e.g. "H10304". */
 const char* lfrfid_hid_format_get_name(const LfRfidHidFormat* format);
+
+/** Whose format it is, "HID" or another maker's name, to go before the name in a list. */
+const char* lfrfid_hid_format_get_manufacturer(const LfRfidHidFormat* format);
 
 /** Whether the format carries a facility code. */
 bool lfrfid_hid_format_has_facility_code(const LfRfidHidFormat* format);

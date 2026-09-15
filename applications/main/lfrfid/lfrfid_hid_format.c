@@ -14,6 +14,7 @@
 
 struct LfRfidHidFormat {
     const char* name; // as shown to the user, e.g. "H10304"
+    const char* manufacturer; // whose format it is; the frame is HID Proximity either way
     uint8_t bit_size; // Wiegand frame length
     uint8_t fc_position; // facility code bit index in the frame, msb first
     uint8_t fc_size; // facility code bits, 0 for a format without one
@@ -132,6 +133,7 @@ static bool lfrfid_hid_format_c1000_35_check_parity(const uint8_t* frame) {
 static const LfRfidHidFormat lfrfid_hid_formats[] = {
     {
         .name = "H10304",
+        .manufacturer = "HID",
         .bit_size = 37,
         .fc_position = 1,
         .fc_size = 16,
@@ -142,6 +144,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "H10302",
+        .manufacturer = "HID",
         .bit_size = 37,
         .fc_position = 0,
         .fc_size = 0,
@@ -152,6 +155,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "S10401",
+        .manufacturer = "HID",
         .bit_size = 37,
         .fc_position = 1,
         .fc_size = 6,
@@ -162,6 +166,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "H10306",
+        .manufacturer = "HID",
         .bit_size = 34,
         .fc_position = 1,
         .fc_size = 16,
@@ -172,6 +177,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "Corp1000-35",
+        .manufacturer = "HID",
         .bit_size = 35,
         .fc_position = 2,
         .fc_size = 12,
@@ -182,6 +188,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "C10202",
+        .manufacturer = "Continental",
         .bit_size = 36,
         .fc_position = 1,
         .fc_size = 16,
@@ -205,6 +212,11 @@ const LfRfidHidFormat* lfrfid_hid_format_get(size_t index) {
 const char* lfrfid_hid_format_get_name(const LfRfidHidFormat* format) {
     furi_check(format);
     return format->name;
+}
+
+const char* lfrfid_hid_format_get_manufacturer(const LfRfidHidFormat* format) {
+    furi_check(format);
+    return format->manufacturer;
 }
 
 bool lfrfid_hid_format_has_facility_code(const LfRfidHidFormat* format) {

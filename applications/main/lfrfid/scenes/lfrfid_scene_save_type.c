@@ -49,10 +49,12 @@ void lfrfid_scene_save_type_on_enter(void* context) {
         // the HID Proximity formats saved as Generic HIDProx, entered by FC/ID, sit with H10301
         if(i == LFRFIDProtocolH10301) {
             for(size_t format_index = 0; format_index < LFRFID_HID_FORMAT_COUNT; format_index++) {
+                const LfRfidHidFormat* hid_format = lfrfid_hid_format_get(format_index);
                 furi_string_printf(
                     protocol_string,
-                    "HID %s",
-                    lfrfid_hid_format_get_name(lfrfid_hid_format_get(format_index)));
+                    "%s %s",
+                    lfrfid_hid_format_get_manufacturer(hid_format),
+                    lfrfid_hid_format_get_name(hid_format));
                 submenu_add_item(
                     submenu,
                     furi_string_get_cstr(protocol_string),
