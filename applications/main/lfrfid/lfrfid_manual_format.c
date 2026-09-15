@@ -15,28 +15,28 @@ typedef struct {
 
 // 26-bit Wiegand: 8-bit facility code, 16-bit card number
 static const LfRfidManualFormatField lfrfid_manual_format_fields_wiegand26[] = {
-    {"Facility Code", 0xFF},
-    {"Card Number", 0xFFFF},
+    {.name = "Facility Code", .max = 0xFF},
+    {.name = "Card Number", .max = 0xFFFF},
 };
 
 static const LfRfidManualFormatField lfrfid_manual_format_fields_io_prox[] = {
-    {"Facility Code", 0xFF},
-    {"Card Number", 0xFFFF},
-    {"Version", 0xFF},
+    {.name = "Facility Code", .max = 0xFF},
+    {.name = "Card Number", .max = 0xFFFF},
+    {.name = "Version", .max = 0xFF},
 };
 
 // The maxima are what the Gallagher encoder packs into a frame
 static const LfRfidManualFormatField lfrfid_manual_format_fields_gallagher[] = {
-    {"Facility Code", 0xFFFF},
-    {"Card Number", 0xFFFFFF},
-    {"Region Code", 0xF},
-    {"Issue Level", 0xF},
+    {.name = "Facility Code", .max = 0xFFFF},
+    {.name = "Card Number", .max = 0xFFFFFF},
+    {.name = "Region Code", .max = 0xF},
+    {.name = "Issue Level", .max = 0xF},
 };
 
 // Casi-Rusco: the two six-digit halves of the badge id
 static const LfRfidManualFormatField lfrfid_manual_format_fields_casi[] = {
-    {"Credential", LFRFID_CASI_CREDENTIAL_MAX},
-    {"Card Number", LFRFID_CASI_CARD_MAX},
+    {.name = "Credential", .max = LFRFID_CASI_CREDENTIAL_MAX},
+    {.name = "Card Number", .max = LFRFID_CASI_CARD_MAX},
 };
 
 static void lfrfid_manual_format_encode_em4100(const uint64_t* values, uint8_t* data) {
@@ -158,7 +158,9 @@ static const LfRfidManualFormatDescriptor lfrfid_manual_format_descriptor_casi =
 };
 
 // The HID Proximity formats are entered by facility code (if the format has one), card
-// number and issue level (if the format has one), in that order
+// number and issue level (if the format has one), in that order. The issue level is a
+// reissue count of the same card number that is not printed on the card and that not every
+// access system records, so it is optional and 0 stands in for one that is not known
 static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
     if(format < LFRFID_MANUAL_FORMAT_HID) {
         return NULL;
@@ -193,6 +195,7 @@ static bool lfrfid_manual_format_hid_field(
     }
 
     const bool has_fc = lfrfid_hid_format_has_facility_code(hid_format);
+    field->optional = false;
     if(has_fc && index == 0) {
         field->name = "Facility Code";
         field->max = lfrfid_hid_format_get_facility_code_max(hid_format);
@@ -200,8 +203,10 @@ static bool lfrfid_manual_format_hid_field(
         field->name = "Card Number";
         field->max = lfrfid_hid_format_get_card_number_max(hid_format);
     } else {
-        field->name = "Issue Level";
+        // named as the read screen prints it, "Issue z"
+        field->name = "Issue";
         field->max = lfrfid_hid_format_get_issue_level_max(hid_format);
+        field->optional = true;
     }
     return true;
 }

@@ -33,6 +33,7 @@ extern "C" {
 typedef struct {
     const char* name; /**< Shown to the user, e.g. "Facility Code" */
     uint64_t max; /**< Largest value the field can hold */
+    bool optional; /**< Not printed on the card and not always known, 0 is a fine answer */
 } LfRfidManualFormatField;
 
 /** The protocol a manual format's data is saved as, PROTOCOL_NO for an unknown id. */
