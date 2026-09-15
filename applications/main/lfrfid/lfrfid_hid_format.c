@@ -20,7 +20,7 @@ struct LfRfidHidFormat {
     uint8_t cn_position; // card number bit index in the frame, msb first
     uint8_t cn_size; // card number bits
     uint8_t issue_position; // issue level bit index in the frame, msb first
-    uint8_t issue_size; // issue level bits, 0 for a format without one
+    uint8_t issue_size; // issue level bits, 0 for a format without one; read, never packed
     void (*set_parity)(uint8_t* frame); // fill in the parity bits of a frame
     bool (*check_parity)(const uint8_t* frame); // whether the parity bits of a frame hold
 };
@@ -78,7 +78,9 @@ static bool lfrfid_hid_format_h10306_check_parity(const uint8_t* frame) {
 // Continental Access / NAPCO CardAccess 3000 C10202 36-bit: the frame splits in two halves
 // of 18, bit 0 odd parity over bits 0-17 and bit 35 even parity over bits 18-35. That is the
 // access system's own definition of the format (odd parity offset 0 length 18, even parity
-// offset 18 length 18); note the parity types are the reverse of the usual HID layouts
+// offset 18 length 18); note the parity types are the reverse of the usual HID layouts.
+// The cards are sold by facility code and card number alone; the access system names the
+// two bits left over at 33-34 "issue", so they are shown as that when a card has them set
 static void lfrfid_hid_format_c10202_set_parity(uint8_t* frame) {
     bit_lib_set_bit(frame, 0, !lfrfid_hid_format_even_parity_bit(frame, 1, 17));
     bit_lib_set_bit(frame, 35, lfrfid_hid_format_even_parity_bit(frame, 18, 17));
@@ -220,16 +222,6 @@ uint64_t lfrfid_hid_format_get_card_number_max(const LfRfidHidFormat* format) {
     return (1ULL << format->cn_size) - 1;
 }
 
-bool lfrfid_hid_format_has_issue_level(const LfRfidHidFormat* format) {
-    furi_check(format);
-    return format->issue_size != 0;
-}
-
-uint64_t lfrfid_hid_format_get_issue_level_max(const LfRfidHidFormat* format) {
-    furi_check(format);
-    return format->issue_size ? (1ULL << format->issue_size) - 1 : 0;
-}
-
 // Frame length from the size header, as protocol_hid_generic reads it:
 // a 1 in the first six bits is the extended header, not a frame handled here
 static uint8_t lfrfid_hid_format_frame_size(const uint8_t* data) {
@@ -288,19 +280,16 @@ void lfrfid_hid_format_encode(
     const LfRfidHidFormat* format,
     uint64_t fc,
     uint64_t cn,
-    uint64_t issue,
     uint8_t* data) {
     furi_check(format);
     furi_check(data);
 
+    // the frame starts zeroed, which leaves an issue level at 0
     uint8_t frame[HID_FRAME_DATA_SIZE] = {0};
     if(format->fc_size) {
         lfrfid_hid_format_set_bits(frame, format->fc_position, fc, format->fc_size);
     }
     lfrfid_hid_format_set_bits(frame, format->cn_position, cn, format->cn_size);
-    if(format->issue_size) {
-        lfrfid_hid_format_set_bits(frame, format->issue_position, issue, format->issue_size);
-    }
     format->set_parity(frame);
 
     memset(data, 0, HID_FIELD_DATA_SIZE);
@@ -330,7 +319,7 @@ void lfrfid_hid_format_render(const uint8_t* data, FuriString* result) {
         } else {
             furi_string_cat_printf(result, "\n%s: Card %llu", format->name, cn);
         }
-        if(format->issue_size) {
+        if(issue) {
             furi_string_cat_printf(result, " Issue %lu", (uint32_t)issue);
         }
     }

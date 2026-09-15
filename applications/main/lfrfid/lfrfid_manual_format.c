@@ -15,28 +15,28 @@ typedef struct {
 
 // 26-bit Wiegand: 8-bit facility code, 16-bit card number
 static const LfRfidManualFormatField lfrfid_manual_format_fields_wiegand26[] = {
-    {.name = "Facility Code", .max = 0xFF},
-    {.name = "Card Number", .max = 0xFFFF},
+    {"Facility Code", 0xFF},
+    {"Card Number", 0xFFFF},
 };
 
 static const LfRfidManualFormatField lfrfid_manual_format_fields_io_prox[] = {
-    {.name = "Facility Code", .max = 0xFF},
-    {.name = "Card Number", .max = 0xFFFF},
-    {.name = "Version", .max = 0xFF},
+    {"Facility Code", 0xFF},
+    {"Card Number", 0xFFFF},
+    {"Version", 0xFF},
 };
 
 // The maxima are what the Gallagher encoder packs into a frame
 static const LfRfidManualFormatField lfrfid_manual_format_fields_gallagher[] = {
-    {.name = "Facility Code", .max = 0xFFFF},
-    {.name = "Card Number", .max = 0xFFFFFF},
-    {.name = "Region Code", .max = 0xF},
-    {.name = "Issue Level", .max = 0xF},
+    {"Facility Code", 0xFFFF},
+    {"Card Number", 0xFFFFFF},
+    {"Region Code", 0xF},
+    {"Issue Level", 0xF},
 };
 
 // Casi-Rusco: the two six-digit halves of the badge id
 static const LfRfidManualFormatField lfrfid_manual_format_fields_casi[] = {
-    {.name = "Credential", .max = LFRFID_CASI_CREDENTIAL_MAX},
-    {.name = "Card Number", .max = LFRFID_CASI_CARD_MAX},
+    {"Credential", LFRFID_CASI_CREDENTIAL_MAX},
+    {"Card Number", LFRFID_CASI_CARD_MAX},
 };
 
 static void lfrfid_manual_format_encode_em4100(const uint64_t* values, uint8_t* data) {
@@ -157,10 +157,8 @@ static const LfRfidManualFormatDescriptor lfrfid_manual_format_descriptor_casi =
     .encode = lfrfid_manual_format_encode_casi,
 };
 
-// The HID Proximity formats are entered by facility code (if the format has one), card
-// number and issue level (if the format has one), in that order. The issue level is a
-// reissue count of the same card number that is not printed on the card and that not every
-// access system records, so it is optional and 0 stands in for one that is not known
+// The HID Proximity formats are entered by facility code (if the format has one) and card
+// number, the two numbers a card is sold by; anything else in the frame packs as 0
 static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
     if(format < LFRFID_MANUAL_FORMAT_HID) {
         return NULL;
@@ -169,21 +167,7 @@ static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
 }
 
 static size_t lfrfid_manual_format_hid_fields_count(const LfRfidHidFormat* hid_format) {
-    return 1 + (lfrfid_hid_format_has_facility_code(hid_format) ? 1 : 0) +
-           (lfrfid_hid_format_has_issue_level(hid_format) ? 1 : 0);
-}
-
-// Sort the values entered into what the format packs, 0 for the fields it does not have
-static void lfrfid_manual_format_hid_values(
-    const LfRfidHidFormat* hid_format,
-    const uint64_t* values,
-    uint64_t* fc,
-    uint64_t* cn,
-    uint64_t* issue) {
-    size_t index = 0;
-    *fc = lfrfid_hid_format_has_facility_code(hid_format) ? values[index++] : 0;
-    *cn = values[index++];
-    *issue = lfrfid_hid_format_has_issue_level(hid_format) ? values[index] : 0;
+    return lfrfid_hid_format_has_facility_code(hid_format) ? 2 : 1;
 }
 
 static bool lfrfid_manual_format_hid_field(
@@ -194,19 +178,12 @@ static bool lfrfid_manual_format_hid_field(
         return false;
     }
 
-    const bool has_fc = lfrfid_hid_format_has_facility_code(hid_format);
-    field->optional = false;
-    if(has_fc && index == 0) {
+    if(lfrfid_hid_format_has_facility_code(hid_format) && index == 0) {
         field->name = "Facility Code";
         field->max = lfrfid_hid_format_get_facility_code_max(hid_format);
-    } else if(index == (has_fc ? 1 : 0)) {
+    } else {
         field->name = "Card Number";
         field->max = lfrfid_hid_format_get_card_number_max(hid_format);
-    } else {
-        // named as the read screen prints it, "Issue z"
-        field->name = "Issue";
-        field->max = lfrfid_hid_format_get_issue_level_max(hid_format);
-        field->optional = true;
     }
     return true;
 }
@@ -291,11 +268,9 @@ bool lfrfid_manual_format_encode(
         if(data_size < lfrfid_protocols[LFRFIDProtocolHidGeneric]->data_size) {
             return false;
         }
-        uint64_t fc;
-        uint64_t cn;
-        uint64_t issue;
-        lfrfid_manual_format_hid_values(hid_format, values, &fc, &cn, &issue);
-        lfrfid_hid_format_encode(hid_format, fc, cn, issue, data);
+        // the card number is the only field of a format without a facility code
+        const bool has_fc = lfrfid_hid_format_has_facility_code(hid_format);
+        lfrfid_hid_format_encode(hid_format, has_fc ? values[0] : 0, values[has_fc ? 1 : 0], data);
         return true;
     }
 

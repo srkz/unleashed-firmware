@@ -15,9 +15,7 @@ static void lfrfid_scene_save_fields_show_field(LfRfid* app) {
     // The input holds an int32, anything larger has to go in as hex
     const int32_t max = MIN(field.max, (uint64_t)INT32_MAX);
 
-    // an optional field is left at 0 when the number is not known
-    lfrfid_text_store_set(
-        app, field.optional ? "%s, optional (0-%ld)" : "%s (0-%ld)", field.name, max);
+    lfrfid_text_store_set(app, "%s (0-%ld)", field.name, max);
     number_input_set_header_text(app->number_input, app->text_store);
     number_input_set_result_callback(
         app->number_input,
