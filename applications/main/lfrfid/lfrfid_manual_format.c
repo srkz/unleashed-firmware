@@ -157,7 +157,8 @@ static const LfRfidManualFormatDescriptor lfrfid_manual_format_descriptor_casi =
     .encode = lfrfid_manual_format_encode_casi,
 };
 
-// The HID Proximity formats are entered by facility code (if the format has one) and card number
+// The HID Proximity formats are entered by facility code (if the format has one), card
+// number and issue level (if the format has one), in that order
 static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
     if(format < LFRFID_MANUAL_FORMAT_HID) {
         return NULL;
@@ -166,7 +167,21 @@ static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
 }
 
 static size_t lfrfid_manual_format_hid_fields_count(const LfRfidHidFormat* hid_format) {
-    return lfrfid_hid_format_has_facility_code(hid_format) ? 2 : 1;
+    return 1 + (lfrfid_hid_format_has_facility_code(hid_format) ? 1 : 0) +
+           (lfrfid_hid_format_has_issue_level(hid_format) ? 1 : 0);
+}
+
+// Sort the values entered into what the format packs, 0 for the fields it does not have
+static void lfrfid_manual_format_hid_values(
+    const LfRfidHidFormat* hid_format,
+    const uint64_t* values,
+    uint64_t* fc,
+    uint64_t* cn,
+    uint64_t* issue) {
+    size_t index = 0;
+    *fc = lfrfid_hid_format_has_facility_code(hid_format) ? values[index++] : 0;
+    *cn = values[index++];
+    *issue = lfrfid_hid_format_has_issue_level(hid_format) ? values[index] : 0;
 }
 
 static bool lfrfid_manual_format_hid_field(
@@ -177,12 +192,16 @@ static bool lfrfid_manual_format_hid_field(
         return false;
     }
 
-    if(lfrfid_hid_format_has_facility_code(hid_format) && index == 0) {
+    const bool has_fc = lfrfid_hid_format_has_facility_code(hid_format);
+    if(has_fc && index == 0) {
         field->name = "Facility Code";
         field->max = lfrfid_hid_format_get_facility_code_max(hid_format);
-    } else {
+    } else if(index == (has_fc ? 1 : 0)) {
         field->name = "Card Number";
         field->max = lfrfid_hid_format_get_card_number_max(hid_format);
+    } else {
+        field->name = "Issue Level";
+        field->max = lfrfid_hid_format_get_issue_level_max(hid_format);
     }
     return true;
 }
@@ -267,9 +286,11 @@ bool lfrfid_manual_format_encode(
         if(data_size < lfrfid_protocols[LFRFIDProtocolHidGeneric]->data_size) {
             return false;
         }
-        // the card number is the only field of a format without a facility code
-        const bool has_fc = lfrfid_hid_format_has_facility_code(hid_format);
-        lfrfid_hid_format_encode(hid_format, has_fc ? values[0] : 0, values[has_fc ? 1 : 0], data);
+        uint64_t fc;
+        uint64_t cn;
+        uint64_t issue;
+        lfrfid_manual_format_hid_values(hid_format, values, &fc, &cn, &issue);
+        lfrfid_hid_format_encode(hid_format, fc, cn, issue, data);
         return true;
     }
 
