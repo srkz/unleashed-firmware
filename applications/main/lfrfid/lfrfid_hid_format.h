@@ -46,8 +46,8 @@ void lfrfid_hid_format_encode(
     uint8_t* data);
 
 /** Append a "NAME: FC x Card y" line to result for every format the 6 bytes of Generic
- * HIDProx data match, with " Issue z" on the end when the format names an issue level and
- * the card carries one other than 0. */
+ * HIDProx data match, the second and later ones as "or NAME: ...", with " Issue z" on the
+ * end when the format names an issue level and the card carries one other than 0. */
 void lfrfid_hid_format_render(const uint8_t* data, FuriString* result);
 
 #ifdef __cplusplus
