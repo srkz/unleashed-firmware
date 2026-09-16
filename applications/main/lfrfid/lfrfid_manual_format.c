@@ -171,7 +171,8 @@ static const LfRfidManualFormatDescriptor lfrfid_manual_format_descriptor_casi =
     .encode = lfrfid_manual_format_encode_casi,
 };
 
-// The HID Proximity formats are entered by facility code (if the format has one) and card number
+// The HID Proximity formats are entered by facility code (if the format has one) and card
+// number, the two numbers a card is sold by; anything else in the frame packs as 0
 static const LfRfidHidFormat* lfrfid_manual_format_hid(uint32_t format) {
     if(format < LFRFID_MANUAL_FORMAT_HID) {
         return NULL;
@@ -229,7 +230,11 @@ void lfrfid_manual_format_get_label(uint32_t format, FuriString* label) {
     } else if(format == LFRFID_MANUAL_FORMAT_CASI) {
         furi_string_set(label, "Casi-Rusco C10106");
     } else if(hid_format) {
-        furi_string_printf(label, "HID %s", lfrfid_hid_format_get_name(hid_format));
+        furi_string_printf(
+            label,
+            "%s %s",
+            lfrfid_hid_format_get_manufacturer(hid_format),
+            lfrfid_hid_format_get_name(hid_format));
     } else {
         furi_string_reset(label);
     }
