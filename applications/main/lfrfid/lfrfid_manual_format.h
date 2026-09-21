@@ -40,7 +40,8 @@ typedef struct {
 ProtocolId lfrfid_manual_format_protocol(uint32_t format);
 
 /** The name a manual format is listed under: the protocol's manufacturer and name, or
- * "HID H10304", "Casi-Rusco C10106" and so on for the formats saved as another protocol. */
+ * "HID H10304", "Continental C10202", "Casi-Rusco C10106" and so on for the formats saved
+ * as another protocol. */
 void lfrfid_manual_format_get_label(uint32_t format, FuriString* label);
 
 /** How many fields a manual format is entered by, 0 when it has no such layout and takes

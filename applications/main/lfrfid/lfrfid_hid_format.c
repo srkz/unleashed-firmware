@@ -14,11 +14,14 @@
 
 struct LfRfidHidFormat {
     const char* name; // as shown to the user, e.g. "H10304"
+    const char* manufacturer; // whose format it is; the frame is HID Proximity either way
     uint8_t bit_size; // Wiegand frame length
     uint8_t fc_position; // facility code bit index in the frame, msb first
     uint8_t fc_size; // facility code bits, 0 for a format without one
     uint8_t cn_position; // card number bit index in the frame, msb first
     uint8_t cn_size; // card number bits
+    uint8_t issue_position; // issue level bit index in the frame, msb first
+    uint8_t issue_size; // issue level bits, 0 for a format without one; read, never packed
     void (*set_parity)(uint8_t* frame); // fill in the parity bits of a frame
     bool (*check_parity)(const uint8_t* frame); // whether the parity bits of a frame hold
 };
@@ -77,6 +80,26 @@ static bool lfrfid_hid_format_h10306_check_parity(const uint8_t* frame) {
            bit_lib_get_bit(frame, 33) == !lfrfid_hid_format_even_parity_bit(frame, 17, 16);
 }
 
+// Continental Access / NAPCO CardAccess C10202 36-bit: the frame splits in two halves of
+// 18, bit 0 odd parity over bits 0-17 and bit 35 even parity over bits 18-35. That is the
+// format definition exported from a live CardAccess 4000 system, the backwards-compatible
+// successor of CardAccess 3000 (odd parity offset 0 length 18, even parity offset 18 length
+// 18); note the parity types are the reverse of the usual HID layouts.
+// The cards are sold by facility code and card number alone; the access system names the
+// two bits left over at 33-34 "issue", so they are shown as that when a card has them set.
+// Ten vendor badges for one system, consecutive card numbers under one facility code, all
+// pass this parity, decode to the numbers printed on them and reported by the panel, have
+// bits 33-34 clear, and match the frame lfrfid_hid_format_encode() builds bit for bit
+static void lfrfid_hid_format_c10202_set_parity(uint8_t* frame) {
+    bit_lib_set_bit(frame, 0, !lfrfid_hid_format_even_parity_bit(frame, 1, 17));
+    bit_lib_set_bit(frame, 35, lfrfid_hid_format_even_parity_bit(frame, 18, 17));
+}
+
+static bool lfrfid_hid_format_c10202_check_parity(const uint8_t* frame) {
+    return bit_lib_get_bit(frame, 0) == !lfrfid_hid_format_even_parity_bit(frame, 1, 17) &&
+           bit_lib_get_bit(frame, 35) == lfrfid_hid_format_even_parity_bit(frame, 18, 17);
+}
+
 // Corporate 1000 35-bit: bit 1 is even parity over 22 bits, bit 34 odd parity over
 // another 22 and bit 0 odd parity over all of bits 1-34, so it is set last
 static const uint8_t lfrfid_hid_format_c1000_35_even_bits[] = {
@@ -118,6 +141,7 @@ static bool lfrfid_hid_format_c1000_35_check_parity(const uint8_t* frame) {
 static const LfRfidHidFormat lfrfid_hid_formats[] = {
     {
         .name = "H10304",
+        .manufacturer = "HID",
         .bit_size = 37,
         .fc_position = 1,
         .fc_size = 16,
@@ -128,6 +152,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "H10302",
+        .manufacturer = "HID",
         .bit_size = 37,
         .fc_position = 0,
         .fc_size = 0,
@@ -138,6 +163,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "S10401",
+        .manufacturer = "AMAG",
         .bit_size = 37,
         .fc_position = 1,
         .fc_size = 6,
@@ -148,6 +174,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "H10306",
+        .manufacturer = "HID",
         .bit_size = 34,
         .fc_position = 1,
         .fc_size = 16,
@@ -158,6 +185,7 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
     },
     {
         .name = "Corp1000-35",
+        .manufacturer = "HID",
         .bit_size = 35,
         .fc_position = 2,
         .fc_size = 12,
@@ -165,6 +193,19 @@ static const LfRfidHidFormat lfrfid_hid_formats[] = {
         .cn_size = 20,
         .set_parity = lfrfid_hid_format_c1000_35_set_parity,
         .check_parity = lfrfid_hid_format_c1000_35_check_parity,
+    },
+    {
+        .name = "C10202",
+        .manufacturer = "Continental",
+        .bit_size = 36,
+        .fc_position = 1,
+        .fc_size = 16,
+        .cn_position = 17,
+        .cn_size = 16,
+        .issue_position = 33,
+        .issue_size = 2,
+        .set_parity = lfrfid_hid_format_c10202_set_parity,
+        .check_parity = lfrfid_hid_format_c10202_check_parity,
     },
 };
 
@@ -179,6 +220,11 @@ const LfRfidHidFormat* lfrfid_hid_format_get(size_t index) {
 const char* lfrfid_hid_format_get_name(const LfRfidHidFormat* format) {
     furi_check(format);
     return format->name;
+}
+
+const char* lfrfid_hid_format_get_manufacturer(const LfRfidHidFormat* format) {
+    furi_check(format);
+    return format->manufacturer;
 }
 
 bool lfrfid_hid_format_has_facility_code(const LfRfidHidFormat* format) {
@@ -230,7 +276,8 @@ static bool lfrfid_hid_format_decode(
     const LfRfidHidFormat* format,
     const uint8_t* data,
     uint64_t* fc,
-    uint64_t* cn) {
+    uint64_t* cn,
+    uint64_t* issue) {
     if(lfrfid_hid_format_frame_size(data) != format->bit_size) {
         return false;
     }
@@ -244,6 +291,9 @@ static bool lfrfid_hid_format_decode(
 
     *fc = format->fc_size ? bit_lib_get_bits_64(frame, format->fc_position, format->fc_size) : 0;
     *cn = bit_lib_get_bits_64(frame, format->cn_position, format->cn_size);
+    *issue = format->issue_size ?
+                 bit_lib_get_bits_64(frame, format->issue_position, format->issue_size) :
+                 0;
     return true;
 }
 
@@ -255,6 +305,7 @@ void lfrfid_hid_format_encode(
     furi_check(format);
     furi_check(data);
 
+    // the frame starts zeroed, which leaves an issue level at 0
     uint8_t frame[HID_FRAME_DATA_SIZE] = {0};
     lfrfid_hid_format_set_bits(frame, format->fc_position, fc, format->fc_size);
     lfrfid_hid_format_set_bits(frame, format->cn_position, cn, format->cn_size);
@@ -279,7 +330,8 @@ void lfrfid_hid_format_render(const uint8_t* data, FuriString* result) {
         const LfRfidHidFormat* format = &lfrfid_hid_formats[i];
         uint64_t fc;
         uint64_t cn;
-        if(!lfrfid_hid_format_decode(format, data, &fc, &cn)) {
+        uint64_t issue;
+        if(!lfrfid_hid_format_decode(format, data, &fc, &cn, &issue)) {
             continue;
         }
 
@@ -288,6 +340,9 @@ void lfrfid_hid_format_render(const uint8_t* data, FuriString* result) {
             furi_string_cat_printf(result, "FC %lu ", (uint32_t)fc);
         }
         furi_string_cat_printf(result, "Card %llu", cn);
+        if(issue) {
+            furi_string_cat_printf(result, " Issue %lu", (uint32_t)issue);
+        }
         matched++;
     }
 }
